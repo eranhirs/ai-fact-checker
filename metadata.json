@@ -1,0 +1,5 @@
+{
+  "name": "AI Overview Verifier",
+  "description": "A simulator for a Chrome Extension that verifies AI Overview claims using Gemini and source text analysis.",
+  "requestFramePermissions": []
+}
