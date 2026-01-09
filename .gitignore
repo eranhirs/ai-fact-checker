@@ -6,5 +6,7 @@ node_modules/
 .env.local
 .env.production
 .env.*.local
+
 keys
-compiled
+compiled/
+.vscode/

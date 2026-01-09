@@ -2,6 +2,8 @@
 
 A Chrome extension that helps users verify claims in AI output by checking them against source citations using Gemini.
 
+![AI Fact Checker](https://raw.githubusercontent.com/eranhirs/ai-fact-checker/main/public/screenshot.jpg)
+
 ## Motivation
 
 Large Language Models (LLMs) are increasingly used to generate content, including Google's AI Overviews in search results. While these AI-generated summaries often include source citations, users may want to verify whether the generated text is actually supported by the cited sources.
