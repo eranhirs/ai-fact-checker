@@ -20,7 +20,7 @@ export interface VerificationResult {
 // Extension message types
 export type ExtensionMessage =
   | { type: 'AI_OVERVIEW_DETECTED'; urls: string[] }
-  | { type: 'TEXT_SELECTED'; text: string }
+  | { type: 'TEXT_SELECTED'; text: string; prioritizedUrls?: string[] }
   | { type: 'VERIFY_CLAIM'; claim: string; sources: SourceDocument[] }
   | { type: 'GET_STATE' }
   | { type: 'SAVE_API_KEY'; apiKey: string }

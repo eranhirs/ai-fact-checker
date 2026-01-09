@@ -36,66 +36,97 @@ function findAIOverview(): Element | null {
   return null;
 }
 
-function extractSourceUrls(container: Element): string[] {
+function cleanUrl(href: string): string | null {
+  if (!href ||
+      href.includes('google.com') ||
+      href.includes('accounts.google') ||
+      href.startsWith('javascript:') ||
+      !href.startsWith('http')) {
+    return null;
+  }
+
+  try {
+    const url = new URL(href);
+    if (url.hostname === 'www.google.com' && url.pathname === '/url') {
+      return url.searchParams.get('url') || url.searchParams.get('q') || null;
+    }
+    return href;
+  } catch {
+    return href;
+  }
+}
+
+function extractUrlsFromElement(container: Element, existingUrls: Set<string>): string[] {
   const urls: string[] = [];
   const links = container.querySelectorAll('a[href]');
 
   for (const link of links) {
-    const href = (link as HTMLAnchorElement).href;
-    // Filter out Google internal links and keep actual source URLs
-    if (href &&
-        !href.includes('google.com') &&
-        !href.includes('accounts.google') &&
-        !href.startsWith('javascript:') &&
-        href.startsWith('http')) {
-      // Clean up Google redirect URLs
-      try {
-        const url = new URL(href);
-        if (url.hostname === 'www.google.com' && url.pathname === '/url') {
-          const actualUrl = url.searchParams.get('url') || url.searchParams.get('q');
-          if (actualUrl) {
-            urls.push(actualUrl);
-            continue;
-          }
-        }
-        urls.push(href);
-      } catch {
-        urls.push(href);
-      }
+    const cleanedUrl = cleanUrl((link as HTMLAnchorElement).href);
+    if (cleanedUrl && !existingUrls.has(cleanedUrl)) {
+      urls.push(cleanedUrl);
+      existingUrls.add(cleanedUrl);
     }
   }
+
+  return urls;
+}
+
+function extractSourceUrls(container: Element): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+
+  // Extract from AI Overview container
+  urls.push(...extractUrlsFromElement(container, seen));
 
   // Also look for citation links in the broader search results
   const searchResults = document.querySelectorAll('#search a[href], #rso a[href]');
   for (const link of searchResults) {
-    const href = (link as HTMLAnchorElement).href;
-    if (href &&
-        !href.includes('google.com') &&
-        !href.startsWith('javascript:') &&
-        href.startsWith('http') &&
-        !urls.includes(href)) {
-      try {
-        const url = new URL(href);
-        if (url.hostname === 'www.google.com' && url.pathname === '/url') {
-          const actualUrl = url.searchParams.get('url') || url.searchParams.get('q');
-          if (actualUrl && !urls.includes(actualUrl)) {
-            urls.push(actualUrl);
-            continue;
-          }
-        }
-        if (!urls.includes(href)) {
-          urls.push(href);
-        }
-      } catch {
-        if (!urls.includes(href)) {
-          urls.push(href);
-        }
-      }
+    const cleanedUrl = cleanUrl((link as HTMLAnchorElement).href);
+    if (cleanedUrl && !seen.has(cleanedUrl)) {
+      urls.push(cleanedUrl);
+      seen.add(cleanedUrl);
     }
   }
 
-  // Dedupe and limit to first 10
-  return [...new Set(urls)].slice(0, 10);
+  // Dedupe and limit
+  return urls.slice(0, 25);
+}
+
+// Extract URLs prioritized by proximity to a DOM node
+function extractUrlsNearSelection(selectionNode: Node): string[] {
+  const seen = new Set<string>();
+  const prioritizedUrls: string[] = [];
+
+  // Walk up the DOM tree, collecting URLs at each level
+  // URLs closer to the selection get added first (higher priority)
+  let current: Node | null = selectionNode;
+  let depth = 0;
+  const maxDepth = 10;
+
+  while (current && depth < maxDepth) {
+    if (current instanceof Element) {
+      const urls = extractUrlsFromElement(current, seen);
+      prioritizedUrls.push(...urls);
+    }
+    current = current.parentNode;
+    depth++;
+  }
+
+  // Add remaining URLs from AI Overview and search results
+  if (aiOverviewElement) {
+    prioritizedUrls.push(...extractUrlsFromElement(aiOverviewElement, seen));
+  }
+
+  const searchResults = document.querySelectorAll('#search a[href], #rso a[href]');
+  for (const link of searchResults) {
+    const cleanedUrl = cleanUrl((link as HTMLAnchorElement).href);
+    if (cleanedUrl && !seen.has(cleanedUrl)) {
+      prioritizedUrls.push(cleanedUrl);
+      seen.add(cleanedUrl);
+    }
+  }
+
+  return prioritizedUrls.slice(0, 25);
 }
 
 function handleTextSelection() {
@@ -105,12 +136,22 @@ function handleTextSelection() {
   if (selectedText && selectedText !== lastSelectedText && selectedText.length > 5) {
     lastSelectedText = selectedText;
 
-    // Send any selection from the page (not just AI Overview)
-    // This makes it easier to test and more flexible
+    // Get URLs prioritized by proximity to the selection
+    const anchorNode = selection?.anchorNode;
+    let prioritizedUrls: string[] = [];
+
+    if (anchorNode) {
+      prioritizedUrls = extractUrlsNearSelection(anchorNode);
+      console.log('[AI Overview Checker] Text selected with', prioritizedUrls.length, 'nearby URLs');
+    }
+
     console.log('[AI Overview Checker] Text selected:', selectedText.substring(0, 50) + '...');
+
+    // Send selection with prioritized URLs
     chrome.runtime.sendMessage({
       type: 'TEXT_SELECTED',
-      text: selectedText
+      text: selectedText,
+      prioritizedUrls
     });
   }
 }

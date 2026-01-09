@@ -188,6 +188,11 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         console.log('[Background] Text selected:', message.text.substring(0, 50));
         const state = await getState();
         state.selectedText = message.text;
+        // Update source URLs if prioritized URLs are provided
+        if (message.prioritizedUrls && message.prioritizedUrls.length > 0) {
+          state.sourceUrls = message.prioritizedUrls;
+          console.log('[Background] Updated source URLs with', message.prioritizedUrls.length, 'prioritized URLs');
+        }
         await setState(state);
       })();
       break;

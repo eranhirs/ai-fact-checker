@@ -14,6 +14,21 @@ function chromeExtensionPlugin(): Plugin {
         path.resolve(__dirname, 'dist/manifest.json')
       );
 
+      // Copy icons
+      const iconsSource = path.resolve(__dirname, 'public/icons');
+      const iconsDest = path.resolve(__dirname, 'dist/icons');
+      if (fs.existsSync(iconsSource)) {
+        if (!fs.existsSync(iconsDest)) {
+          fs.mkdirSync(iconsDest, { recursive: true });
+        }
+        for (const file of fs.readdirSync(iconsSource)) {
+          fs.copyFileSync(
+            path.join(iconsSource, file),
+            path.join(iconsDest, file)
+          );
+        }
+      }
+
       // Rename sidepanel html if needed
       const srcHtml = path.resolve(__dirname, 'dist/src/sidepanel/index.html');
       const destHtml = path.resolve(__dirname, 'dist/sidepanel.html');

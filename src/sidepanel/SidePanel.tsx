@@ -46,9 +46,13 @@ const SidePanel: React.FC = () => {
     if (state.selectedText && state.selectedText !== claim) {
       setClaim(state.selectedText);
       setResult(null);
-    }
 
-    if (state.sourceUrls.length > 0 && sources.length === 0) {
+      // Reinitialize sources with new prioritized URLs when text changes
+      if (state.sourceUrls.length > 0) {
+        initializeSources(state.sourceUrls);
+      }
+    } else if (state.sourceUrls.length > 0 && sources.length === 0) {
+      // Initial source load
       initializeSources(state.sourceUrls);
     }
   };
@@ -72,6 +76,26 @@ const SidePanel: React.FC = () => {
       error: `Error - ${source.error || 'Failed to fetch'}`
     };
     return `${statusText[source.status]}\n${source.url}`;
+  };
+
+  // Generate a URL with text fragment to highlight the quote
+  const getHighlightUrl = (baseUrl: string, quote: string): string => {
+    // Remove any existing fragment
+    const urlWithoutFragment = baseUrl.split('#')[0];
+
+    // Clean and truncate the quote for the text fragment
+    // Text fragments work best with shorter, exact phrases
+    let textToHighlight = quote
+      .trim()
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .slice(0, 150); // Keep it reasonable length
+
+    // Encode special characters for text fragment
+    // These characters have special meaning in text fragments: - , &
+    const encoded = encodeURIComponent(textToHighlight)
+      .replace(/-/g, '%2D');
+
+    return `${urlWithoutFragment}#:~:text=${encoded}`;
   };
 
   const handleSaveApiKey = () => {
@@ -313,14 +337,33 @@ const SidePanel: React.FC = () => {
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Supporting Evidence
                 </label>
-                {result.evidence.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 border-l-4 border-purple-500 rounded-r text-sm text-gray-700 italic flex flex-col gap-1">
-                    <span>"{item.quote}"</span>
-                    <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block w-full" title={item.sourceUrl}>
-                      {item.sourceUrl}
-                    </a>
-                  </div>
-                ))}
+                {result.evidence.map((item, idx) => {
+                  const highlightUrl = getHighlightUrl(item.sourceUrl, item.quote);
+                  return (
+                    <div key={idx} className="rounded-lg border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow">
+                      <a
+                        href={highlightUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 bg-purple-50 hover:bg-purple-100 transition-colors border-b border-purple-100"
+                      >
+                        <div className="flex items-center gap-2">
+                          <LinkIcon className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-purple-700 truncate">
+                            {new URL(item.sourceUrl).hostname}
+                          </span>
+                          <ExternalLinkIcon className="w-3 h-3 text-purple-400 flex-shrink-0 ml-auto" />
+                        </div>
+                        <div className="text-[10px] text-purple-500 truncate mt-0.5" title={highlightUrl}>
+                          {item.sourceUrl}
+                        </div>
+                      </a>
+                      <div className="p-3 text-sm text-gray-700 italic bg-gray-50">
+                        "{item.quote}"
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -383,6 +426,19 @@ const HelpCircleIcon = ({ className }: { className?: string }) => (
 const SettingsIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+  </svg>
+);
+
+const LinkIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+  </svg>
+);
+
+const ExternalLinkIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
   </svg>
 );
 
