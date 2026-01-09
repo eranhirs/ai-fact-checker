@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "AI Overview Fact Checker",
+  "version": "1.0.0",
+  "description": "Verify AI Overview claims against their source citations using Gemini",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.google.com/search*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "AI Overview Fact Checker"
+  }
+}

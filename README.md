@@ -1,20 +1,18 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+  To install and test:
 
-# Run and deploy your AI Studio app
+  1. Open Chrome and go to chrome://extensions/
+  2. Enable "Developer mode" (toggle in top right)
+  3. Click "Load unpacked"
+  4. Select the dist folder: /Users/hirsche/git/attribution-queries-extension/dist
 
-This contains everything you need to run your app locally.
+  How it works:
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Vf5X_TCXXxofixhqxZzs0GGf5IGe4wgj
+  1. Navigate to Google and search for something that generates an AI Overview
+  2. The extension auto-detects the AI Overview and opens the side panel
+  3. Click the gear icon to set your Gemini API key
+  4. Select text from the AI Overview
+  5. Click "Verify Selection" to fact-check the claim against source citations
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+  Development:
+  - Run npm run dev for watch mode (rebuilds on changes)
+  - Run npm run build for production build
