@@ -1,10 +1,13 @@
 // Background service worker for the extension
 
 import { GoogleGenAI, Type } from '@google/genai';
-import type { ExtensionMessage, ExtensionState, SourceDocument, VerificationResult } from '../types';
+import type { ExtensionMessage, ExtensionState, SourceDocument, VerificationResult, TelemetryEvent } from '../types';
+import { sendTelemetryEvent, getTelemetryLevel, setTelemetryLevel, extractDomain } from './telemetry';
 
 const STORAGE_KEY = 'gemini_api_key';
 const STATE_KEY = 'extension_state';
+const MAX_SOURCES_KEY = 'max_sources';
+const DEFAULT_MAX_SOURCES = 10;
 
 function getDefaultState(): ExtensionState {
   return {
@@ -31,6 +34,15 @@ async function getApiKey(): Promise<string> {
 
 async function setApiKey(apiKey: string): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY]: apiKey });
+}
+
+async function getMaxSources(): Promise<number> {
+  const result = await chrome.storage.local.get(MAX_SOURCES_KEY);
+  return result[MAX_SOURCES_KEY] ?? DEFAULT_MAX_SOURCES;
+}
+
+async function setMaxSources(maxSources: number): Promise<void> {
+  await chrome.storage.local.set({ [MAX_SOURCES_KEY]: maxSources });
 }
 
 async function fetchPageContent(url: string): Promise<string> {
@@ -225,10 +237,98 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     }
 
     case 'VERIFY_CLAIM': {
-      verifyWithGemini(message.claim, message.sources).then(result => {
-        sendResponse({ type: 'VERIFICATION_RESULT', result });
-      }).catch(error => {
-        sendResponse({ type: 'VERIFICATION_ERROR', error: error.message });
+      (async () => {
+        const state = await getState();
+        const startTime = Date.now();
+
+        // Get the page URL where the user made the verification call (Google Search page)
+        const pageUrl = sender.tab?.url || '';
+        const domain = extractDomain(pageUrl);
+
+        // Send verification_started event
+        const startEvent: TelemetryEvent = {
+          event_name: 'verification_started',
+          timestamp: startTime,
+          domain,
+          source_count: message.sources.length,
+          full_url: pageUrl,
+          claim_text: message.claim,
+          claim_length: message.claim.length,
+          source_urls: message.sources.map(s => s.url),
+        };
+        sendTelemetryEvent(startEvent);
+
+        try {
+          const result = await verifyWithGemini(message.claim, message.sources);
+          const endTime = Date.now();
+
+          // Send verification_completed event
+          const completedEvent: TelemetryEvent = {
+            event_name: 'verification_completed',
+            timestamp: endTime,
+            domain,
+            success: true,
+            source_count: message.sources.length,
+            full_url: pageUrl,
+            claim_text: message.claim,
+            claim_length: message.claim.length,
+            source_urls: message.sources.map(s => s.url),
+            verification_status: result.status,
+            evidence_count: result.evidence.length,
+            verify_duration_ms: endTime - startTime,
+          };
+          sendTelemetryEvent(completedEvent);
+
+          sendResponse({ type: 'VERIFICATION_RESULT', result });
+        } catch (error: any) {
+          const endTime = Date.now();
+
+          // Send verification_error event
+          const errorEvent: TelemetryEvent = {
+            event_name: 'verification_error',
+            timestamp: endTime,
+            domain,
+            success: false,
+            source_count: message.sources.length,
+            full_url: pageUrl,
+            claim_text: message.claim,
+            claim_length: message.claim.length,
+            source_urls: message.sources.map(s => s.url),
+            error_message: error.message,
+            verify_duration_ms: endTime - startTime,
+          };
+          sendTelemetryEvent(errorEvent);
+
+          sendResponse({ type: 'VERIFICATION_ERROR', error: error.message });
+        }
+      })();
+      return true;
+    }
+
+    case 'GET_TELEMETRY_LEVEL': {
+      getTelemetryLevel().then(level => {
+        sendResponse({ level });
+      });
+      return true;
+    }
+
+    case 'SAVE_TELEMETRY_LEVEL': {
+      setTelemetryLevel(message.level).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
+
+    case 'GET_MAX_SOURCES': {
+      getMaxSources().then(maxSources => {
+        sendResponse({ maxSources });
+      });
+      return true;
+    }
+
+    case 'SAVE_MAX_SOURCES': {
+      setMaxSources(message.maxSources).then(() => {
+        sendResponse({ success: true });
       });
       return true;
     }
@@ -248,4 +348,4 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-console.log('[AI Overview Checker] Background service worker started');
+console.log('[AI Fact Checker] Background service worker started');

@@ -29,11 +29,37 @@ export type ExtensionMessage =
   | { type: 'VERIFICATION_RESULT'; result: VerificationResult }
   | { type: 'VERIFICATION_ERROR'; error: string }
   | { type: 'PAGE_CONTENT'; url: string; content: string }
-  | { type: 'PAGE_FETCH_ERROR'; url: string; error: string };
+  | { type: 'PAGE_FETCH_ERROR'; url: string; error: string }
+  | { type: 'SAVE_TELEMETRY_LEVEL'; level: TelemetryLevel }
+  | { type: 'GET_TELEMETRY_LEVEL' }
+  | { type: 'SAVE_MAX_SOURCES'; maxSources: number }
+  | { type: 'GET_MAX_SOURCES' };
 
 export interface ExtensionState {
   aiOverviewDetected: boolean;
   selectedText: string;
   sourceUrls: string[];
   apiKeySet: boolean;
+}
+
+// Telemetry types
+export type TelemetryLevel = 'off' | 'statistics' | 'verbose';
+
+export interface TelemetryEvent {
+  event_name: 'verification_started' | 'verification_completed' | 'verification_error';
+  timestamp: number;
+  // Statistics level fields
+  domain?: string;
+  success?: boolean;
+  verification_status?: string;
+  source_count?: number;
+  // Verbose level fields
+  full_url?: string;
+  claim_text?: string;
+  claim_length?: number;
+  source_urls?: string[];
+  evidence_count?: number;
+  fetch_duration_ms?: number;
+  verify_duration_ms?: number;
+  error_message?: string;
 }

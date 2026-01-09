@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Overview Fact Checker",
+  "name": "AI Fact Checker",
   "version": "1.0.0",
-  "description": "Verify AI Overview claims against their source citations using Gemini",
+  "description": "Verify AI claims against their source citations using Gemini",
   "permissions": [
     "storage",
     "sidePanel",
@@ -32,7 +32,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "AI Overview Fact Checker",
+    "default_title": "AI Fact Checker",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

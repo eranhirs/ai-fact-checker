@@ -75,7 +75,7 @@ function extractSourceUrls(container: Element): string[] {
   const seen = new Set<string>();
   const urls: string[] = [];
 
-  // Extract from AI Overview container
+  // Extract from AI output container
   urls.push(...extractUrlsFromElement(container, seen));
 
   // Also look for citation links in the broader search results

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "telemetry": "node scripts/extract-telemetry.js",
+    "telemetry:csv": "node scripts/extract-telemetry.js --output=csv",
+    "telemetry:bq": "node scripts/extract-telemetry-bigquery.js",
+    "telemetry:bq:csv": "node scripts/extract-telemetry-bigquery.js --output=csv"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
@@ -14,6 +18,8 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@google-analytics/data": "^5.2.1",
+    "@google-cloud/bigquery": "^8.1.1",
     "@types/chrome": "^0.0.287",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",

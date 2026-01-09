@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage } from '../../types';
+import React, { useEffect, useState, useRef } from 'react';
+import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage, TelemetryLevel } from '../../types';
+
+const DEFAULT_MAX_SOURCES = 10;
 
 const SidePanel: React.FC = () => {
   const [claim, setClaim] = useState('');
@@ -11,6 +13,11 @@ const SidePanel: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [apiKeySaved, setApiKeySaved] = useState(false);
   const [aiOverviewDetected, setAiOverviewDetected] = useState(false);
+  const [telemetryLevel, setTelemetryLevel] = useState<TelemetryLevel>('off');
+  const [telemetrySaved, setTelemetrySaved] = useState(false);
+  const [maxSources, setMaxSources] = useState(DEFAULT_MAX_SOURCES);
+  const [maxSourcesSaved, setMaxSourcesSaved] = useState(false);
+  const maxSourcesRef = useRef(DEFAULT_MAX_SOURCES);
 
   // Load initial state and listen for storage changes
   useEffect(() => {
@@ -26,6 +33,20 @@ const SidePanel: React.FC = () => {
       if (result.gemini_api_key) {
         setApiKey(result.gemini_api_key);
       }
+    });
+
+    // Load saved telemetry level
+    chrome.runtime.sendMessage({ type: 'GET_TELEMETRY_LEVEL' }, (response) => {
+      if (response?.level) {
+        setTelemetryLevel(response.level);
+      }
+    });
+
+    // Load saved max sources
+    chrome.storage.local.get('max_sources', (result) => {
+      const value = result.max_sources ?? DEFAULT_MAX_SOURCES;
+      setMaxSources(value);
+      maxSourcesRef.current = value;
     });
 
     // Listen for storage changes (state updates from background/content script)
@@ -57,8 +78,9 @@ const SidePanel: React.FC = () => {
     }
   };
 
-  const initializeSources = (urls: string[]) => {
-    const initialSources: SourceDocument[] = urls.map(url => ({
+  const initializeSources = (urls: string[], limit?: number) => {
+    const limitedUrls = urls.slice(0, limit ?? maxSourcesRef.current);
+    const initialSources: SourceDocument[] = limitedUrls.map(url => ({
       id: Math.random().toString(36).substr(2, 9),
       url,
       title: new URL(url).hostname,
@@ -103,6 +125,28 @@ const SidePanel: React.FC = () => {
       setApiKeySaved(true);
       setTimeout(() => setApiKeySaved(false), 2000);
     });
+  };
+
+  const handleTelemetryChange = (level: TelemetryLevel) => {
+    setTelemetryLevel(level);
+    chrome.runtime.sendMessage({ type: 'SAVE_TELEMETRY_LEVEL', level }, () => {
+      setTelemetrySaved(true);
+      setTimeout(() => setTelemetrySaved(false), 2000);
+    });
+  };
+
+  const handleMaxSourcesChange = (value: number) => {
+    setMaxSources(value);
+    maxSourcesRef.current = value;
+    chrome.runtime.sendMessage({ type: 'SAVE_MAX_SOURCES', maxSources: value }, () => {
+      setMaxSourcesSaved(true);
+      setTimeout(() => setMaxSourcesSaved(false), 2000);
+    });
+    // Re-initialize sources with new limit if we have URLs
+    if (sources.length > 0) {
+      const urls = sources.map(s => s.url).slice(0, value);
+      initializeSources(urls, value);
+    }
   };
 
   const handleVerify = async () => {
@@ -218,6 +262,54 @@ const SidePanel: React.FC = () => {
                 Google AI Studio
               </a>
             </p>
+          </div>
+
+          {/* Max Sources Setting */}
+          <div className="space-y-2 pt-3 border-t border-gray-200">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Max Sources to Verify
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="1"
+                max="25"
+                value={maxSources}
+                onChange={(e) => handleMaxSourcesChange(parseInt(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
+              <span className="text-sm font-medium text-gray-700 w-8 text-center">{maxSources}</span>
+            </div>
+            {maxSourcesSaved && (
+              <p className="text-xs text-green-600">Saved!</p>
+            )}
+            <p className="text-xs text-gray-400">
+              Limit the number of source URLs to fetch and analyze. Lower values are faster but may miss relevant sources.
+            </p>
+          </div>
+
+          {/* Telemetry Settings */}
+          <div className="space-y-2 pt-3 border-t border-gray-200">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Usage Analytics (Opt-in)
+            </label>
+            <select
+              value={telemetryLevel}
+              onChange={(e) => handleTelemetryChange(e.target.value as TelemetryLevel)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none bg-white"
+            >
+              <option value="off">Off - No data collected</option>
+              <option value="statistics">Statistics - Domain &amp; success only</option>
+              <option value="verbose">Verbose - Full usage details</option>
+            </select>
+            {telemetrySaved && (
+              <p className="text-xs text-green-600">Saved!</p>
+            )}
+            <div className="text-xs text-gray-400 space-y-1">
+              <p><strong>Statistics:</strong> Sends only the domain of verified pages and whether verification succeeded.</p>
+              <p><strong>Verbose:</strong> Also includes full URLs, claim text, source URLs, results, and timing data.</p>
+              <p className="text-gray-500 italic">Your data helps improve the extension. Thank you!</p>
+            </div>
           </div>
         </div>
       )}

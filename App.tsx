@@ -39,7 +39,7 @@ const App: React.FC = () => {
       
       {/* Informational overlay for the user of this simulator */}
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-full text-sm backdrop-blur-md shadow-lg pointer-events-none z-50 text-center">
-        Highlight text in the AI Overview (left) to verify it with Gemini.<br/>
+        Highlight text in the AI output (left) to verify it with Gemini.<br/>
         <span className="text-xs opacity-75">Using simulated Google Search HTML</span>
       </div>
     </div>
