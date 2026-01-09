@@ -83,32 +83,9 @@ You can optionally enable anonymous usage analytics to help improve the extensio
 
 Telemetry data is sent to Google Analytics and cannot be used to identify you. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for full details.
 
-
-**Extract data:**
-```bash
-BIGQUERY_PROJECT_ID=your-gcp-project \
-BIGQUERY_DATASET_ID=analytics_123456789 \
-GOOGLE_APPLICATION_CREDENTIALS=./key.json \
-npm run telemetry:bq
-
-# CSV output for last 30 days:
-npm run telemetry:bq:csv -- --days=30 > telemetry.csv
-```
-
-The dataset ID is usually `analytics_YOUR_PROPERTY_ID` (find in BigQuery console).
-
-#### Option 2: GA4 Data API
-
-For basic event counts (without custom parameters):
-
-```bash
-GA4_PROPERTY_ID=123456789 \
-GOOGLE_APPLICATION_CREDENTIALS=./key.json \
-npm run telemetry
-```
-
 ## Limitations
 
+- **Search results**: The extension only searches within citations (URLs) available in the current page.
 - **AI-generated responses**: This extension uses an LLM to verify claims which can make mistakes.
 - **AI-generated code**: This extension was generated using [Claude Code](https://claude.ai/claude-code) by Anthropic. While functional, the code may not follow all best practices.
 - **Source detection**: The extension uses heuristics to detect AI Overviews and extract source URLs, which may not work perfectly on all Google Search variations or locales.

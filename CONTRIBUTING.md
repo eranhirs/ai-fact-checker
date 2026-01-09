@@ -73,3 +73,26 @@ BigQuery export includes **all event parameters** automatically.
 1. **Enable BigQuery export**: GA4 Admin → BigQuery Links → Link to your GCP project
 2. **Wait 24-48 hours** for data to start flowing
 3. **Create service account**: GCP Console → IAM → Service Accounts → Create with "BigQuery Data Viewer" role
+
+**Extract data:**
+```bash
+BIGQUERY_PROJECT_ID=your-gcp-project \
+BIGQUERY_DATASET_ID=analytics_123456789 \
+GOOGLE_APPLICATION_CREDENTIALS=./key.json \
+npm run telemetry:bq
+
+# CSV output for last 30 days:
+npm run telemetry:bq:csv -- --days=30 > telemetry.csv
+```
+
+The dataset ID is usually `analytics_YOUR_PROPERTY_ID` (find in BigQuery console).
+
+#### Option 2: GA4 Data API
+
+For basic event counts (without custom parameters):
+
+```bash
+GA4_PROPERTY_ID=123456789 \
+GOOGLE_APPLICATION_CREDENTIALS=./key.json \
+npm run telemetry
+```
