@@ -10,3 +10,5 @@ node_modules/
 keys
 compiled/
 .vscode/
+
+.DS_STORE
