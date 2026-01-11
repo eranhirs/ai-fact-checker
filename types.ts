@@ -28,15 +28,19 @@ export type ExtensionMessage =
   | { type: 'STATE_UPDATE'; state: ExtensionState }
   | { type: 'VERIFICATION_RESULT'; result: VerificationResult }
   | { type: 'VERIFICATION_ERROR'; error: string }
-  | { type: 'PAGE_CONTENT'; url: string; content: string }
+  | { type: 'PAGE_CONTENT'; url: string; content: string; finalUrl?: string }
   | { type: 'PAGE_FETCH_ERROR'; url: string; error: string }
   | { type: 'SAVE_TELEMETRY_LEVEL'; level: TelemetryLevel }
   | { type: 'GET_TELEMETRY_LEVEL' }
   | { type: 'SAVE_MAX_SOURCES'; maxSources: number }
-  | { type: 'GET_MAX_SOURCES' };
+  | { type: 'GET_MAX_SOURCES' }
+  | { type: 'GENERIC_PAGE_ACTIVATED' };
+
+export type PageMode = 'ai_overview' | 'generic' | 'inactive';
 
 export interface ExtensionState {
   aiOverviewDetected: boolean;
+  pageMode: PageMode;
   selectedText: string;
   sourceUrls: string[];
   apiKeySet: boolean;

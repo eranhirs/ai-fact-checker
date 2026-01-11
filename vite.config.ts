@@ -57,6 +57,7 @@ export default defineConfig({
         sidepanel: path.resolve(__dirname, 'src/sidepanel/index.html'),
         background: path.resolve(__dirname, 'src/background.ts'),
         'content-script': path.resolve(__dirname, 'src/content-script.ts'),
+        'generic-content-script': path.resolve(__dirname, 'src/generic-content-script.ts'),
       },
       output: {
         entryFileNames: '[name].js',

@@ -12,6 +12,7 @@ const DEFAULT_MAX_SOURCES = 10;
 function getDefaultState(): ExtensionState {
   return {
     aiOverviewDetected: false,
+    pageMode: 'inactive',
     selectedText: '',
     sourceUrls: [],
     apiKeySet: false
@@ -45,9 +46,54 @@ async function setMaxSources(maxSources: number): Promise<void> {
   await chrome.storage.local.set({ [MAX_SOURCES_KEY]: maxSources });
 }
 
-async function fetchPageContent(url: string): Promise<string> {
+// Resolve redirect URLs to get the actual target URL
+function resolveRedirectUrl(url: string): string {
   try {
-    const response = await fetch(url);
+    const parsed = new URL(url);
+
+    // Handle Google redirect URLs (www.google.com/url?...)
+    if (parsed.hostname === 'www.google.com' && parsed.pathname === '/url') {
+      const targetUrl = parsed.searchParams.get('url') || parsed.searchParams.get('q');
+      if (targetUrl) {
+        // Recursively resolve in case the target is also a redirect
+        return resolveRedirectUrl(targetUrl);
+      }
+    }
+
+    // Handle Google grounding API redirect URLs
+    // These need to be followed via HTTP to get the actual URL
+    if (parsed.hostname === 'vertexaisearch.cloud.google.com' &&
+        parsed.pathname.startsWith('/grounding-api-redirect/')) {
+      // Return as-is, will be resolved via fetch redirect
+      return url;
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+interface FetchResult {
+  content: string;
+  finalUrl: string;
+}
+
+async function fetchPageContent(url: string): Promise<FetchResult> {
+  try {
+    // First resolve any known redirect URL patterns
+    const resolvedUrl = resolveRedirectUrl(url);
+    console.log('[Background] Fetching URL:', resolvedUrl, resolvedUrl !== url ? `(resolved from ${url})` : '');
+
+    // Fetch with redirect following enabled (default behavior)
+    const response = await fetch(resolvedUrl);
+
+    // Get the final URL after any redirects
+    const finalUrl = response.url;
+    if (finalUrl !== resolvedUrl) {
+      console.log('[Background] Followed redirect to:', finalUrl);
+    }
+
     const html = await response.text();
 
     // Extract text from HTML without DOMParser (not available in Service Workers)
@@ -72,7 +118,10 @@ async function fetchPageContent(url: string): Promise<string> {
       .replace(/\s+/g, ' ')
       .trim();
 
-    return text.slice(0, 15000);
+    return {
+      content: text.slice(0, 15000),
+      finalUrl
+    };
   } catch (error) {
     console.error('Failed to fetch page:', url, error);
     throw error;
@@ -176,6 +225,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         console.log('[Background] AI Overview detected with URLs:', message.urls);
         const state = await getState();
         state.aiOverviewDetected = true;
+        state.pageMode = 'ai_overview';
         state.sourceUrls = message.urls;
         await setState(state);
 
@@ -228,8 +278,13 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
     }
 
     case 'FETCH_PAGE': {
-      fetchPageContent(message.url).then(content => {
-        sendResponse({ type: 'PAGE_CONTENT', url: message.url, content });
+      fetchPageContent(message.url).then(result => {
+        sendResponse({
+          type: 'PAGE_CONTENT',
+          url: message.url,
+          content: result.content,
+          finalUrl: result.finalUrl
+        });
       }).catch(error => {
         sendResponse({ type: 'PAGE_FETCH_ERROR', url: message.url, error: error.message });
       });
@@ -332,6 +387,19 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       });
       return true;
     }
+
+    case 'GENERIC_PAGE_ACTIVATED': {
+      (async () => {
+        console.log('[Background] Generic page activated');
+        const state = await getState();
+        state.pageMode = 'generic';
+        state.aiOverviewDetected = false;
+        state.selectedText = '';
+        state.sourceUrls = [];
+        await setState(state);
+      })();
+      break;
+    }
   }
 });
 
@@ -342,9 +410,33 @@ chrome.tabs.onRemoved.addListener(() => {
 });
 
 // Handle extension icon click - open side panel
-chrome.action.onClicked.addListener((tab) => {
+chrome.action.onClicked.addListener(async (tab) => {
   if (tab.id) {
-    chrome.sidePanel.open({ tabId: tab.id });
+    // Open the side panel
+    await chrome.sidePanel.open({ tabId: tab.id });
+
+    const url = tab.url || '';
+    const isGoogleSearch = url.includes('google.com/search');
+
+    if (!isGoogleSearch) {
+      // Inject generic content script for non-Google pages
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['generic-content-script.js']
+        });
+        console.log('[Background] Injected generic content script');
+      } catch (error) {
+        console.error('[Background] Failed to inject content script:', error);
+        // Still update state to generic mode even if injection fails
+        const state = await getState();
+        state.pageMode = 'generic';
+        state.aiOverviewDetected = false;
+        state.selectedText = '';
+        state.sourceUrls = [];
+        await setState(state);
+      }
+    }
   }
 });
 

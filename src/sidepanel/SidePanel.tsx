@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage, TelemetryLevel } from '../../types';
+import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage, TelemetryLevel, PageMode } from '../../types';
 
 const DEFAULT_MAX_SOURCES = 10;
 
@@ -13,6 +13,7 @@ const SidePanel: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [apiKeySaved, setApiKeySaved] = useState(false);
   const [aiOverviewDetected, setAiOverviewDetected] = useState(false);
+  const [pageMode, setPageMode] = useState<PageMode>('inactive');
   const [telemetryLevel, setTelemetryLevel] = useState<TelemetryLevel>('off');
   const [telemetrySaved, setTelemetrySaved] = useState(false);
   const [maxSources, setMaxSources] = useState(DEFAULT_MAX_SOURCES);
@@ -63,6 +64,7 @@ const SidePanel: React.FC = () => {
 
   const handleStateUpdate = (state: ExtensionState) => {
     setAiOverviewDetected(state.aiOverviewDetected);
+    setPageMode(state.pageMode || 'inactive');
 
     if (state.selectedText && state.selectedText !== claim) {
       setClaim(state.selectedText);
@@ -173,6 +175,12 @@ const SidePanel: React.FC = () => {
             updatedSources[i].content = response.content;
             updatedSources[i].status = 'fetched';
             updatedSources[i].error = undefined;
+            // Update URL if we followed a redirect to a different final URL
+            if (response.finalUrl && response.finalUrl !== updatedSources[i].url) {
+              console.log('[SidePanel] URL redirected:', updatedSources[i].url, '->', response.finalUrl);
+              updatedSources[i].url = response.finalUrl;
+              updatedSources[i].title = new URL(response.finalUrl).hostname;
+            }
           } else if (response?.type === 'PAGE_FETCH_ERROR') {
             updatedSources[i].status = 'error';
             updatedSources[i].error = response.error;
@@ -315,9 +323,20 @@ const SidePanel: React.FC = () => {
       )}
 
       {/* Status Banner */}
-      {!aiOverviewDetected && (
+      {pageMode === 'ai_overview' && (
+        <div className="p-3 bg-purple-50 border-b border-purple-100 text-purple-800 text-sm flex items-center gap-2">
+          <span className="w-5 h-5 bg-purple-600 rounded text-white text-xs flex items-center justify-center font-bold">AI</span>
+          AI Overview detected - Select text to verify
+        </div>
+      )}
+      {pageMode === 'generic' && (
+        <div className="p-3 bg-blue-50 border-b border-blue-100 text-blue-800 text-sm">
+          Select text on this page to verify against linked sources
+        </div>
+      )}
+      {pageMode === 'inactive' && (
         <div className="p-3 bg-yellow-50 border-b border-yellow-100 text-yellow-800 text-sm">
-          Waiting for AI Overview detection on Google Search...
+          Click on a page to start fact-checking
         </div>
       )}
 
@@ -330,7 +349,9 @@ const SidePanel: React.FC = () => {
           <textarea
             value={claim}
             onChange={(e) => setClaim(e.target.value)}
-            placeholder="Select text from the AI Overview to verify..."
+            placeholder={pageMode === 'ai_overview'
+              ? "Select text from the AI Overview to verify..."
+              : "Select text from this page to verify..."}
             className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none bg-gray-50 text-gray-800"
           />
         </div>
@@ -341,7 +362,9 @@ const SidePanel: React.FC = () => {
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Sources ({sources.length})
             </label>
-            <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">Auto-detected</span>
+            <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">
+              {pageMode === 'ai_overview' ? 'From AI Overview' : 'Near selection'}
+            </span>
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {sources.map(source => (
@@ -382,7 +405,11 @@ const SidePanel: React.FC = () => {
             ))}
             {sources.length === 0 && (
               <div className="text-xs text-gray-400 italic text-center py-2">
-                No sources detected yet. Navigate to a Google Search with AI Overview.
+                {pageMode === 'ai_overview'
+                  ? "No sources detected yet. Select text from the AI Overview."
+                  : pageMode === 'generic'
+                  ? "No sources detected yet. Select text near links to verify."
+                  : "Open a page and click the extension icon to start."}
               </div>
             )}
           </div>

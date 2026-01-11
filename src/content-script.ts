@@ -38,8 +38,6 @@ function findAIOverview(): Element | null {
 
 function cleanUrl(href: string): string | null {
   if (!href ||
-      href.includes('google.com') ||
-      href.includes('accounts.google') ||
       href.startsWith('javascript:') ||
       !href.startsWith('http')) {
     return null;
@@ -47,9 +45,25 @@ function cleanUrl(href: string): string | null {
 
   try {
     const url = new URL(href);
+
+    // Handle Google redirect URLs - extract the actual target URL
     if (url.hostname === 'www.google.com' && url.pathname === '/url') {
-      return url.searchParams.get('url') || url.searchParams.get('q') || null;
+      const targetUrl = url.searchParams.get('url') || url.searchParams.get('q');
+      if (targetUrl) {
+        // Recursively clean the extracted URL (handles nested redirects)
+        return cleanUrl(targetUrl);
+      }
+      return null;
     }
+
+    // Filter out Google internal URLs (but allow redirect targets we've extracted)
+    if (url.hostname.includes('google.com') && !url.hostname.includes('vertexaisearch')) {
+      return null;
+    }
+    if (href.includes('accounts.google')) {
+      return null;
+    }
+
     return href;
   } catch {
     return href;
