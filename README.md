@@ -28,7 +28,7 @@ For more details on localized attribution queries, see the [LAQuer paper](https:
 ### Option 1: Download Release (Recommended)
 
 1. **Download the extension**
-   - Go to the [Releases page](https://github.com/eranhirs/attribution-queries-extension/releases/latest)
+   - Go to the [Releases page](https://github.com/eranhirs/ai-fact-checker/releases/latest)
    - Download `ai-fact-checker-v1.0.0.zip`
    - Extract the zip file
 
@@ -47,8 +47,8 @@ For more details on localized attribution queries, see the [LAQuer paper](https:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/eranhirs/attribution-queries-extension.git
-   cd attribution-queries-extension
+   git clone https://github.com/eranhirs/ai-fact-checker.git
+   cd ai-fact-checker
    ```
 
 2. **Install dependencies and build**
