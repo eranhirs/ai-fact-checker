@@ -79,7 +79,17 @@ interface FetchResult {
   finalUrl: string;
 }
 
+// Cache to store already-fetched page content and avoid recrawling
+// Key: original URL, Value: FetchResult
+const pageContentCache = new Map<string, FetchResult>();
+
 async function fetchPageContent(url: string): Promise<FetchResult> {
+  // Check if we already have this URL cached
+  const cachedResult = pageContentCache.get(url);
+  if (cachedResult) {
+    console.log('[Background] Using cached content for URL:', url);
+    return cachedResult;
+  }
   try {
     // First resolve any known redirect URL patterns
     const resolvedUrl = resolveRedirectUrl(url);
@@ -118,10 +128,19 @@ async function fetchPageContent(url: string): Promise<FetchResult> {
       .replace(/\s+/g, ' ')
       .trim();
 
-    return {
+    const result: FetchResult = {
       content: text.slice(0, 15000),
       finalUrl
     };
+
+    // Cache the result for future requests
+    pageContentCache.set(url, result);
+    // Also cache by final URL if different (handles redirects)
+    if (finalUrl !== url) {
+      pageContentCache.set(finalUrl, result);
+    }
+
+    return result;
   } catch (error) {
     console.error('Failed to fetch page:', url, error);
     throw error;
