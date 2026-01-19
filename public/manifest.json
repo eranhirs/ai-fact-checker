@@ -5,9 +5,7 @@
   "description": "Verify AI claims against their source citations using Gemini",
   "permissions": [
     "storage",
-    "sidePanel",
-    "activeTab",
-    "scripting"
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -20,6 +18,12 @@
     {
       "matches": ["*://www.google.com/search*"],
       "js": ["content-script.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "exclude_matches": ["*://www.google.com/search*"],
+      "js": ["generic-content-script.js"],
       "run_at": "document_idle"
     }
   ],

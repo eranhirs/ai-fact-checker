@@ -1,7 +1,8 @@
 // Generic content script for non-Google pages
-// Injected programmatically when user opens side panel on any webpage
+// Loaded on all non-Google pages, but only activates when user clicks extension icon
 
 let lastSelectedText = '';
+let isActivated = false;
 
 function cleanUrl(href: string): string | null {
   if (!href ||
@@ -159,6 +160,8 @@ function extractSurroundingContext(selection: Selection): string {
 }
 
 function handleTextSelection() {
+  if (!isActivated) return;
+
   const selection = window.getSelection();
   const selectedText = selection?.toString().trim() || '';
 
@@ -189,7 +192,10 @@ function handleTextSelection() {
   }
 }
 
-function init() {
+function activate() {
+  if (isActivated) return;
+  isActivated = true;
+
   // Listen for text selection
   document.addEventListener('mouseup', handleTextSelection);
   document.addEventListener('keyup', (e) => {
@@ -202,9 +208,13 @@ function init() {
   chrome.runtime.sendMessage({
     type: 'GENERIC_PAGE_ACTIVATED'
   });
+
+  console.log('[AI Fact Checker - Generic] Activated on:', window.location.hostname);
 }
 
-// Run immediately since we're injected on demand
-init();
-
-console.log('[AI Fact Checker - Generic] Content script loaded on:', window.location.hostname);
+// Listen for activation message from background
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'ACTIVATE_GENERIC_CONTENT_SCRIPT') {
+    activate();
+  }
+});

@@ -605,23 +605,9 @@ chrome.action.onClicked.addListener(async (tab) => {
     const isGoogleSearch = url.includes('google.com/search');
 
     if (!isGoogleSearch) {
-      // Inject generic content script for non-Google pages
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['generic-content-script.js']
-        });
-        console.log('[Background] Injected generic content script');
-      } catch (error) {
-        console.error('[Background] Failed to inject content script:', error);
-        // Still update state to generic mode even if injection fails
-        const state = await getState();
-        state.pageMode = 'generic';
-        state.aiOverviewDetected = false;
-        state.selectedText = '';
-        state.sourceUrls = [];
-        await setState(state);
-      }
+      // Activate the generic content script (already loaded via manifest)
+      chrome.tabs.sendMessage(tab.id, { type: 'ACTIVATE_GENERIC_CONTENT_SCRIPT' });
+      console.log('[Background] Sent activation message to generic content script');
     }
   }
 });

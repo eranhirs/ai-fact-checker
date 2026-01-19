@@ -25,7 +25,7 @@ npm run build
 npm run dev
 
 # Build the extension
-rm ai-overview-fact-checker.zip && cd dist && zip -r ../compiled/ai-fact-checker.zip .
+rm compiled/ai-fact-checker.zip && cd dist && zip -r ../compiled/ai-fact-checker.zip . && cd ..
 
 ```
 

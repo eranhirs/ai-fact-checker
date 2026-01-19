@@ -1,5 +1,0 @@
-{
-  "name": "AI Verifier",
-  "description": "A Chrome Extension that verifies AI claims using Gemini and source text analysis.",
-  "requestFramePermissions": []
-}
