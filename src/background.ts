@@ -573,6 +573,39 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       return true;
     }
 
+    case 'REQUEST_PERMISSIONS': {
+      (async () => {
+        try {
+          // Extract unique origins from URLs
+          const origins = new Set<string>();
+          for (const url of message.urls) {
+            try {
+              const resolvedUrl = resolveRedirectUrl(url);
+              const urlObj = new URL(resolvedUrl);
+              origins.add(`${urlObj.protocol}//${urlObj.host}/*`);
+            } catch {
+              // Skip invalid URLs
+            }
+          }
+
+          if (origins.size === 0) {
+            sendResponse({ granted: true });
+            return;
+          }
+
+          // Request permissions for all origins at once
+          const granted = await chrome.permissions.request({
+            origins: Array.from(origins)
+          });
+          sendResponse({ granted });
+        } catch (error: any) {
+          console.error('[Background] Permission request error:', error);
+          sendResponse({ granted: false, error: error.message });
+        }
+      })();
+      return true;
+    }
+
     case 'GENERIC_PAGE_ACTIVATED': {
       (async () => {
         console.log('[Background] Generic page activated');

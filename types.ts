@@ -38,6 +38,7 @@ export type ExtensionMessage =
   | { type: 'GET_MAX_SOURCES' }
   | { type: 'SAVE_MODEL'; model: GeminiModel }
   | { type: 'GET_MODEL' }
+  | { type: 'REQUEST_PERMISSIONS'; urls: string[] }
   | { type: 'GENERIC_PAGE_ACTIVATED' };
 
 export type PageMode = 'ai_overview' | 'generic' | 'inactive';

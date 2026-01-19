@@ -187,7 +187,20 @@ const SidePanel: React.FC = () => {
     setClaimWasModified(false);
 
     try {
-      // Step 1: Decontextualize the claim first (runs before crawling)
+      // Step 1: Request permissions for all source URLs
+      const sourceUrls = sources.map(s => s.url);
+      const permResponse = await chrome.runtime.sendMessage({
+        type: 'REQUEST_PERMISSIONS',
+        urls: sourceUrls
+      });
+
+      if (!permResponse?.granted) {
+        setError('Permission denied. Please grant access to source websites to verify claims.');
+        setIsVerifying(false);
+        return;
+      }
+
+      // Step 2: Decontextualize the claim first (runs before crawling)
       const decontextResponse = await chrome.runtime.sendMessage({
         type: 'DECONTEXTUALIZE_CLAIM',
         claim
@@ -200,7 +213,7 @@ const SidePanel: React.FC = () => {
         }
       }
 
-      // Step 2: Fetch content for each source
+      // Step 3: Fetch content for each source
       const updatedSources = [...sources];
 
       for (let i = 0; i < updatedSources.length; i++) {
@@ -238,7 +251,7 @@ const SidePanel: React.FC = () => {
         setSources([...updatedSources]);
       }
 
-      // Step 3: Verify with Gemini
+      // Step 4: Verify with Gemini
       const response = await chrome.runtime.sendMessage({
         type: 'VERIFY_CLAIM',
         claim,

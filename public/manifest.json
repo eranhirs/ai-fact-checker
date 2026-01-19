@@ -5,9 +5,10 @@
   "description": "Verify AI claims against their source citations using Gemini",
   "permissions": [
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "activeTab"
   ],
-  "host_permissions": [
+  "optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {
