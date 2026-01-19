@@ -143,6 +143,80 @@ function extractUrlsNearSelection(selectionNode: Node): string[] {
   return prioritizedUrls.slice(0, 25);
 }
 
+// Extract surrounding context from the selection's container element
+function extractSurroundingContext(selection: Selection): string {
+  const anchorNode = selection.anchorNode;
+  if (!anchorNode) return '';
+
+  // First, try to get context from the AI Overview element if the selection is within it
+  if (aiOverviewElement && aiOverviewElement.contains(anchorNode)) {
+    const overviewText = aiOverviewElement.textContent?.trim() || '';
+    if (overviewText.length > 0) {
+      console.log('[AI Overview Checker] Using AI Overview context');
+      return overviewText.slice(0, 2000);
+    }
+  }
+
+  // Find the nearest block-level container that provides meaningful context
+  let container: Element | null = anchorNode.parentElement;
+  const blockElements = ['P', 'DIV', 'SECTION', 'ARTICLE', 'LI', 'TD', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'SPAN'];
+
+  // Walk up to find a suitable container with enough text
+  while (container) {
+    const containerText = container.textContent?.trim() || '';
+    // Stop if we find a container with substantial text (more than just the selection)
+    if (blockElements.includes(container.tagName) && containerText.length > 50) {
+      break;
+    }
+    container = container.parentElement;
+  }
+
+  // If we found a block container, get its full text plus siblings for more context
+  if (container) {
+    let contextParts: string[] = [];
+
+    // Get previous sibling's text if it exists (for preceding context)
+    const prevSibling = container.previousElementSibling;
+    if (prevSibling) {
+      const prevText = prevSibling.textContent?.trim();
+      if (prevText && prevText.length > 10 && prevText.length < 500) {
+        contextParts.push(prevText);
+      }
+    }
+
+    // Get the container's full text
+    const containerText = container.textContent?.trim();
+    if (containerText) {
+      contextParts.push(containerText);
+    }
+
+    // Get next sibling's text if it exists (for following context)
+    const nextSibling = container.nextElementSibling;
+    if (nextSibling) {
+      const nextText = nextSibling.textContent?.trim();
+      if (nextText && nextText.length > 10 && nextText.length < 500) {
+        contextParts.push(nextText);
+      }
+    }
+
+    const fullContext = contextParts.join('\n\n');
+    if (fullContext.length > 0) {
+      console.log('[AI Overview Checker] Using container context, length:', fullContext.length);
+      return fullContext.slice(0, 2000);
+    }
+  }
+
+  // Fallback: get text from the AI Overview element if available
+  if (aiOverviewElement) {
+    const overviewText = aiOverviewElement.textContent?.trim() || '';
+    console.log('[AI Overview Checker] Fallback to AI Overview context, length:', overviewText.length);
+    return overviewText.slice(0, 2000);
+  }
+
+  console.log('[AI Overview Checker] No context found');
+  return '';
+}
+
 function handleTextSelection() {
   const selection = window.getSelection();
   const selectedText = selection?.toString().trim() || '';
@@ -153,19 +227,23 @@ function handleTextSelection() {
     // Get URLs prioritized by proximity to the selection
     const anchorNode = selection?.anchorNode;
     let prioritizedUrls: string[] = [];
+    let surroundingContext = '';
 
     if (anchorNode) {
       prioritizedUrls = extractUrlsNearSelection(anchorNode);
+      surroundingContext = extractSurroundingContext(selection);
       console.log('[AI Overview Checker] Text selected with', prioritizedUrls.length, 'nearby URLs');
+      console.log('[AI Overview Checker] Surrounding context length:', surroundingContext.length);
     }
 
     console.log('[AI Overview Checker] Text selected:', selectedText.substring(0, 50) + '...');
 
-    // Send selection with prioritized URLs
+    // Send selection with prioritized URLs and surrounding context
     chrome.runtime.sendMessage({
       type: 'TEXT_SELECTED',
       text: selectedText,
-      prioritizedUrls
+      prioritizedUrls,
+      surroundingContext
     });
   }
 }

@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch",
+    "dev": "vite build --minify false --watch",
     "build": "vite build",
     "preview": "vite preview",
     "telemetry": "node scripts/extract-telemetry.js",

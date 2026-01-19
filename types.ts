@@ -20,13 +20,13 @@ export interface VerificationResult {
 // Extension message types
 export type ExtensionMessage =
   | { type: 'AI_OVERVIEW_DETECTED'; urls: string[] }
-  | { type: 'TEXT_SELECTED'; text: string; prioritizedUrls?: string[] }
+  | { type: 'TEXT_SELECTED'; text: string; prioritizedUrls?: string[]; surroundingContext?: string }
   | { type: 'VERIFY_CLAIM'; claim: string; sources: SourceDocument[] }
   | { type: 'GET_STATE' }
   | { type: 'SAVE_API_KEY'; apiKey: string }
   | { type: 'FETCH_PAGE'; url: string }
   | { type: 'STATE_UPDATE'; state: ExtensionState }
-  | { type: 'VERIFICATION_RESULT'; result: VerificationResult }
+  | { type: 'VERIFICATION_RESULT'; result: VerificationResult; decontextualizedClaim?: string; claimWasModified?: boolean }
   | { type: 'VERIFICATION_ERROR'; error: string }
   | { type: 'PAGE_CONTENT'; url: string; content: string; finalUrl?: string }
   | { type: 'PAGE_FETCH_ERROR'; url: string; error: string }
@@ -42,6 +42,7 @@ export interface ExtensionState {
   aiOverviewDetected: boolean;
   pageMode: PageMode;
   selectedText: string;
+  surroundingContext: string;
   sourceUrls: string[];
   apiKeySet: boolean;
 }

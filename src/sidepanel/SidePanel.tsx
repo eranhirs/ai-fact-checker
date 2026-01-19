@@ -8,6 +8,8 @@ const SidePanel: React.FC = () => {
   const [sources, setSources] = useState<SourceDocument[]>([]);
   const [isVerifying, setIsVerifying] = useState(false);
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const [verifiedClaim, setVerifiedClaim] = useState<string | null>(null);
+  const [claimWasModified, setClaimWasModified] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState('');
@@ -69,6 +71,8 @@ const SidePanel: React.FC = () => {
     if (state.selectedText && state.selectedText !== claim) {
       setClaim(state.selectedText);
       setResult(null);
+      setVerifiedClaim(null);
+      setClaimWasModified(false);
 
       // Reinitialize sources with new prioritized URLs when text changes
       if (state.sourceUrls.length > 0) {
@@ -156,6 +160,8 @@ const SidePanel: React.FC = () => {
     setIsVerifying(true);
     setError(null);
     setResult(null);
+    setVerifiedClaim(null);
+    setClaimWasModified(false);
 
     try {
       // Step 1: Fetch content for each source
@@ -205,6 +211,11 @@ const SidePanel: React.FC = () => {
 
       if (response?.type === 'VERIFICATION_RESULT') {
         setResult(response.result);
+        // Store the claim that was actually verified
+        if (response.decontextualizedClaim) {
+          setVerifiedClaim(response.decontextualizedClaim);
+          setClaimWasModified(response.claimWasModified || false);
+        }
       } else if (response?.type === 'VERIFICATION_ERROR') {
         setError(response.error);
       }
@@ -451,6 +462,26 @@ const SidePanel: React.FC = () => {
               </p>
             </div>
 
+            {/* Show the claim that was actually verified */}
+            {verifiedClaim && (
+              <div className={`p-3 rounded-lg border ${claimWasModified ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <RefineIcon className={`w-3.5 h-3.5 ${claimWasModified ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${claimWasModified ? 'text-blue-700' : 'text-gray-600'}`}>
+                    {claimWasModified ? 'Claim Clarified' : 'Claim Verified'}
+                  </span>
+                </div>
+                <p className={`text-sm ${claimWasModified ? 'text-blue-800' : 'text-gray-700'}`}>
+                  "{verifiedClaim}"
+                </p>
+                {claimWasModified && (
+                  <p className="text-[10px] text-blue-500 mt-1">
+                    The selected text was expanded for context before verification.
+                  </p>
+                )}
+              </div>
+            )}
+
             {result.evidence.length > 0 && (
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -558,6 +589,12 @@ const ExternalLinkIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
     <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
     <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+  </svg>
+);
+
+const RefineIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
   </svg>
 );
 

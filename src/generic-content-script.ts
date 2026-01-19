@@ -108,6 +108,56 @@ function extractUrlsNearSelection(selectionNode: Node): string[] {
   return prioritizedUrls.slice(0, 25);
 }
 
+// Extract surrounding context from the selection's container element
+function extractSurroundingContext(selection: Selection): string {
+  const anchorNode = selection.anchorNode;
+  if (!anchorNode) return '';
+
+  // Find the nearest block-level container that provides meaningful context
+  let container: Element | null = anchorNode.parentElement;
+  const blockElements = ['P', 'DIV', 'SECTION', 'ARTICLE', 'LI', 'TD', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+
+  // Walk up to find a suitable container
+  while (container && !blockElements.includes(container.tagName)) {
+    container = container.parentElement;
+  }
+
+  // If we found a block container, get its full text plus siblings for more context
+  if (container) {
+    let contextParts: string[] = [];
+
+    // Get previous sibling's text if it exists (for preceding context)
+    const prevSibling = container.previousElementSibling;
+    if (prevSibling && blockElements.includes(prevSibling.tagName)) {
+      const prevText = prevSibling.textContent?.trim();
+      if (prevText && prevText.length < 500) {
+        contextParts.push(prevText);
+      }
+    }
+
+    // Get the container's full text
+    const containerText = container.textContent?.trim();
+    if (containerText) {
+      contextParts.push(containerText);
+    }
+
+    // Get next sibling's text if it exists (for following context)
+    const nextSibling = container.nextElementSibling;
+    if (nextSibling && blockElements.includes(nextSibling.tagName)) {
+      const nextText = nextSibling.textContent?.trim();
+      if (nextText && nextText.length < 500) {
+        contextParts.push(nextText);
+      }
+    }
+
+    const fullContext = contextParts.join('\n\n');
+    // Limit context to a reasonable size
+    return fullContext.slice(0, 2000);
+  }
+
+  return '';
+}
+
 function handleTextSelection() {
   const selection = window.getSelection();
   const selectedText = selection?.toString().trim() || '';
@@ -118,19 +168,23 @@ function handleTextSelection() {
     // Get URLs prioritized by proximity to the selection
     const anchorNode = selection?.anchorNode;
     let prioritizedUrls: string[] = [];
+    let surroundingContext = '';
 
     if (anchorNode) {
       prioritizedUrls = extractUrlsNearSelection(anchorNode);
+      surroundingContext = extractSurroundingContext(selection);
       console.log('[AI Fact Checker - Generic] Text selected with', prioritizedUrls.length, 'nearby URLs');
+      console.log('[AI Fact Checker - Generic] Surrounding context length:', surroundingContext.length);
     }
 
     console.log('[AI Fact Checker - Generic] Text selected:', selectedText.substring(0, 50) + '...');
 
-    // Send selection with prioritized URLs
+    // Send selection with prioritized URLs and surrounding context
     chrome.runtime.sendMessage({
       type: 'TEXT_SELECTED',
       text: selectedText,
-      prioritizedUrls
+      prioritizedUrls,
+      surroundingContext
     });
   }
 }

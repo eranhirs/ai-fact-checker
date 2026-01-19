@@ -14,6 +14,7 @@ function getDefaultState(): ExtensionState {
     aiOverviewDetected: false,
     pageMode: 'inactive',
     selectedText: '',
+    surroundingContext: '',
     sourceUrls: [],
     apiKeySet: false
   };
@@ -190,7 +191,7 @@ async function verifyWithGemini(
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -234,6 +235,98 @@ async function verifyWithGemini(
   }
 }
 
+interface DecontextualizedClaim {
+  decontextualizedClaim: string;
+  wasModified: boolean;
+}
+
+async function decontextualizeClaim(
+  claim: string,
+  surroundingContext: string
+): Promise<DecontextualizedClaim> {
+  // If there's no context or the claim is already self-contained, skip decontextualization
+  if (!surroundingContext || surroundingContext.trim().length === 0) {
+    return { decontextualizedClaim: claim, wasModified: false };
+  }
+
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    // If no API key, return original claim
+    return { decontextualizedClaim: claim, wasModified: false };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `You are a text decontextualization assistant. Your task is to rewrite a selected text snippet to be self-contained and understandable without the original context.
+
+SURROUNDING CONTEXT:
+"""
+${surroundingContext}
+"""
+
+SELECTED CLAIM (highlighted by user):
+"""
+${claim}
+"""
+
+INSTRUCTIONS:
+1. Analyze the selected claim for any of the following issues that make it unclear without context:
+   - Pronouns (it, they, this, that, he, she, its, their)
+   - Demonstratives (this, that, these, those)
+   - Relative references ("the function", "the value", "the process" when not defined)
+   - Parenthetical fragments that reference something from the surrounding sentence
+   - Incomplete phrases or sentence fragments that need their subject or object
+2. If the claim has any of these issues, rewrite it to be a complete, self-contained statement by incorporating the necessary context.
+3. Keep the rewritten claim concise and as close to the original meaning as possible.
+4. If the claim is already self-contained and clear, return it unchanged.
+5. The decontextualized claim must be factually equivalent to the original - do not add, remove, or alter any factual content.
+
+Examples:
+- Original: "It returns a string" with context about "The parseJSON function..." → "The parseJSON function returns a string"
+- Original: "They can grow up to 30 feet" with context about "Blue whales..." → "Blue whales can grow up to 30 feet"
+- Original: "(around 25Hz)" with context "The vibrations from purring (around 25Hz) are believed to help..." → "The vibrations from cats purring are around 25Hz"
+- Original: "which helps with bone density" with context about purring → "Cat purring helps with bone density"
+- Original: "The Earth orbits the Sun" (already clear) → "The Earth orbits the Sun"`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            decontextualizedClaim: {
+              type: Type.STRING,
+              description: 'The rewritten claim that is self-contained and understandable without context.'
+            },
+            wasModified: {
+              type: Type.BOOLEAN,
+              description: 'True if the claim was modified, false if it was already self-contained.'
+            }
+          },
+          required: ['decontextualizedClaim', 'wasModified']
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) {
+      console.warn('[Background] Empty decontextualization response, using original claim');
+      return { decontextualizedClaim: claim, wasModified: false };
+    }
+
+    const result = JSON.parse(resultText) as DecontextualizedClaim;
+    console.log('[Background] Decontextualization result:', result);
+    return result;
+  } catch (error) {
+    console.error('Decontextualization error:', error);
+    // On error, return original claim
+    return { decontextualizedClaim: claim, wasModified: false };
+  }
+}
+
 // Handle messages from content script and side panel
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
   const tabId = sender.tab?.id;
@@ -269,6 +362,11 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         console.log('[Background] Text selected:', message.text.substring(0, 50));
         const state = await getState();
         state.selectedText = message.text;
+        // Store surrounding context for decontextualization
+        if (message.surroundingContext) {
+          state.surroundingContext = message.surroundingContext;
+          console.log('[Background] Stored surrounding context, length:', message.surroundingContext.length);
+        }
         // Update source URLs if prioritized URLs are provided
         if (message.prioritizedUrls && message.prioritizedUrls.length > 0) {
           state.sourceUrls = message.prioritizedUrls;
@@ -319,6 +417,23 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         const pageUrl = sender.tab?.url || '';
         const domain = extractDomain(pageUrl);
 
+        // Decontextualize the claim using surrounding context
+        console.log('[Background] Decontextualizing claim:', message.claim);
+        console.log('[Background] Surrounding context available:', state.surroundingContext?.length || 0, 'chars');
+
+        const { decontextualizedClaim, wasModified } = await decontextualizeClaim(
+          message.claim,
+          state.surroundingContext
+        );
+
+        console.log('[Background] Decontextualization result - wasModified:', wasModified, 'claim:', decontextualizedClaim);
+        if (wasModified) {
+          console.log('[Background] Claim decontextualized:', message.claim, '->', decontextualizedClaim);
+        }
+
+        // Use the decontextualized claim for verification
+        const claimToVerify = decontextualizedClaim;
+
         // Send verification_started event
         const startEvent: TelemetryEvent = {
           event_name: 'verification_started',
@@ -326,14 +441,14 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           domain,
           source_count: message.sources.length,
           full_url: pageUrl,
-          claim_text: message.claim,
-          claim_length: message.claim.length,
+          claim_text: claimToVerify,
+          claim_length: claimToVerify.length,
           source_urls: message.sources.map(s => s.url),
         };
         sendTelemetryEvent(startEvent);
 
         try {
-          const result = await verifyWithGemini(message.claim, message.sources);
+          const result = await verifyWithGemini(claimToVerify, message.sources);
           const endTime = Date.now();
 
           // Send verification_completed event
@@ -344,8 +459,8 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
             success: true,
             source_count: message.sources.length,
             full_url: pageUrl,
-            claim_text: message.claim,
-            claim_length: message.claim.length,
+            claim_text: claimToVerify,
+            claim_length: claimToVerify.length,
             source_urls: message.sources.map(s => s.url),
             verification_status: result.status,
             evidence_count: result.evidence.length,
@@ -353,7 +468,14 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           };
           sendTelemetryEvent(completedEvent);
 
-          sendResponse({ type: 'VERIFICATION_RESULT', result });
+          // Include decontextualization info in the response
+          // Always send the claim that was verified and whether it was modified
+          sendResponse({
+            type: 'VERIFICATION_RESULT',
+            result,
+            decontextualizedClaim: claimToVerify,
+            claimWasModified: wasModified
+          });
         } catch (error: any) {
           const endTime = Date.now();
 
@@ -365,8 +487,8 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
             success: false,
             source_count: message.sources.length,
             full_url: pageUrl,
-            claim_text: message.claim,
-            claim_length: message.claim.length,
+            claim_text: claimToVerify,
+            claim_length: claimToVerify.length,
             source_urls: message.sources.map(s => s.url),
             error_message: error.message,
             verify_duration_ms: endTime - startTime,
@@ -414,6 +536,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         state.pageMode = 'generic';
         state.aiOverviewDetected = false;
         state.selectedText = '';
+        state.surroundingContext = '';
         state.sourceUrls = [];
         await setState(state);
       })();
