@@ -2,7 +2,8 @@
 
 A Chrome extension that helps users verify claims in AI output by checking them against source citations using Gemini.
 
-![AI Fact Checker](https://raw.githubusercontent.com/eranhirs/ai-fact-checker/main/public/screenshot.jpg)
+https://github.com/user-attachments/assets/fc9075ca-46ef-4298-a6ff-0492bd1b8806
+
 
 ## Motivation
 
