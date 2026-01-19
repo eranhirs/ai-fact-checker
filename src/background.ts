@@ -1,13 +1,15 @@
 // Background service worker for the extension
 
 import { GoogleGenAI, Type } from '@google/genai';
-import type { ExtensionMessage, ExtensionState, SourceDocument, VerificationResult, TelemetryEvent } from '../types';
+import type { ExtensionMessage, ExtensionState, SourceDocument, VerificationResult, TelemetryEvent, GeminiModel } from '../types';
 import { sendTelemetryEvent, getTelemetryLevel, setTelemetryLevel, extractDomain } from './telemetry';
 
 const STORAGE_KEY = 'gemini_api_key';
 const STATE_KEY = 'extension_state';
 const MAX_SOURCES_KEY = 'max_sources';
+const MODEL_KEY = 'gemini_model';
 const DEFAULT_MAX_SOURCES = 10;
+const DEFAULT_MODEL: GeminiModel = 'gemini-3-flash-preview';
 
 function getDefaultState(): ExtensionState {
   return {
@@ -45,6 +47,15 @@ async function getMaxSources(): Promise<number> {
 
 async function setMaxSources(maxSources: number): Promise<void> {
   await chrome.storage.local.set({ [MAX_SOURCES_KEY]: maxSources });
+}
+
+async function getModel(): Promise<GeminiModel> {
+  const result = await chrome.storage.local.get(MODEL_KEY);
+  return result[MODEL_KEY] || DEFAULT_MODEL;
+}
+
+async function setModel(model: GeminiModel): Promise<void> {
+  await chrome.storage.local.set({ [MODEL_KEY]: model });
 }
 
 // Resolve redirect URLs to get the actual target URL
@@ -153,6 +164,7 @@ async function verifyWithGemini(
   sources: SourceDocument[]
 ): Promise<VerificationResult> {
   const apiKey = await getApiKey();
+  const model = await getModel();
 
   if (!apiKey) {
     throw new Error('No API key configured. Please set your Gemini API key in settings.');
@@ -191,7 +203,7 @@ async function verifyWithGemini(
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model,
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -250,6 +262,7 @@ async function decontextualizeClaim(
   }
 
   const apiKey = await getApiKey();
+  const model = await getModel();
   if (!apiKey) {
     // If no API key, return original claim
     return { decontextualizedClaim: claim, wasModified: false };
@@ -290,7 +303,7 @@ Examples:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model,
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -362,6 +375,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         console.log('[Background] Text selected:', message.text.substring(0, 50));
         const state = await getState();
         state.selectedText = message.text;
+        // Clear previous decontextualized claim when new text is selected
+        state.decontextualizedClaim = undefined;
+        state.claimWasModified = undefined;
         // Store surrounding context for decontextualization
         if (message.surroundingContext) {
           state.surroundingContext = message.surroundingContext;
@@ -408,6 +424,32 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
       return true;
     }
 
+    case 'DECONTEXTUALIZE_CLAIM': {
+      (async () => {
+        const state = await getState();
+        console.log('[Background] Decontextualizing claim:', message.claim);
+
+        const { decontextualizedClaim, wasModified } = await decontextualizeClaim(
+          message.claim,
+          state.surroundingContext
+        );
+
+        // Update state immediately so SidePanel can show it
+        if (wasModified) {
+          state.decontextualizedClaim = decontextualizedClaim;
+          state.claimWasModified = true;
+          await setState(state);
+        }
+
+        sendResponse({
+          type: 'DECONTEXTUALIZATION_RESULT',
+          decontextualizedClaim,
+          claimWasModified: wasModified
+        });
+      })();
+      return true;
+    }
+
     case 'VERIFY_CLAIM': {
       (async () => {
         const state = await getState();
@@ -417,22 +459,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         const pageUrl = sender.tab?.url || '';
         const domain = extractDomain(pageUrl);
 
-        // Decontextualize the claim using surrounding context
-        console.log('[Background] Decontextualizing claim:', message.claim);
-        console.log('[Background] Surrounding context available:', state.surroundingContext?.length || 0, 'chars');
-
-        const { decontextualizedClaim, wasModified } = await decontextualizeClaim(
-          message.claim,
-          state.surroundingContext
-        );
-
-        console.log('[Background] Decontextualization result - wasModified:', wasModified, 'claim:', decontextualizedClaim);
-        if (wasModified) {
-          console.log('[Background] Claim decontextualized:', message.claim, '->', decontextualizedClaim);
-        }
-
-        // Use the decontextualized claim for verification
-        const claimToVerify = decontextualizedClaim;
+        // Use the decontextualized claim from state if available, otherwise use original
+        const claimToVerify = state.decontextualizedClaim || message.claim;
+        const wasModified = state.claimWasModified || false;
+        console.log('[Background] Verifying claim:', claimToVerify, 'wasModified:', wasModified);
 
         // Send verification_started event
         const startEvent: TelemetryEvent = {
@@ -524,6 +554,20 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
 
     case 'SAVE_MAX_SOURCES': {
       setMaxSources(message.maxSources).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
+    }
+
+    case 'GET_MODEL': {
+      getModel().then(model => {
+        sendResponse({ model });
+      });
+      return true;
+    }
+
+    case 'SAVE_MODEL': {
+      setModel(message.model).then(() => {
         sendResponse({ success: true });
       });
       return true;

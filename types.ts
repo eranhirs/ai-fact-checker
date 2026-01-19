@@ -21,6 +21,8 @@ export interface VerificationResult {
 export type ExtensionMessage =
   | { type: 'AI_OVERVIEW_DETECTED'; urls: string[] }
   | { type: 'TEXT_SELECTED'; text: string; prioritizedUrls?: string[]; surroundingContext?: string }
+  | { type: 'DECONTEXTUALIZE_CLAIM'; claim: string }
+  | { type: 'DECONTEXTUALIZATION_RESULT'; decontextualizedClaim: string; claimWasModified: boolean }
   | { type: 'VERIFY_CLAIM'; claim: string; sources: SourceDocument[] }
   | { type: 'GET_STATE' }
   | { type: 'SAVE_API_KEY'; apiKey: string }
@@ -34,6 +36,8 @@ export type ExtensionMessage =
   | { type: 'GET_TELEMETRY_LEVEL' }
   | { type: 'SAVE_MAX_SOURCES'; maxSources: number }
   | { type: 'GET_MAX_SOURCES' }
+  | { type: 'SAVE_MODEL'; model: GeminiModel }
+  | { type: 'GET_MODEL' }
   | { type: 'GENERIC_PAGE_ACTIVATED' };
 
 export type PageMode = 'ai_overview' | 'generic' | 'inactive';
@@ -45,7 +49,12 @@ export interface ExtensionState {
   surroundingContext: string;
   sourceUrls: string[];
   apiKeySet: boolean;
+  decontextualizedClaim?: string;
+  claimWasModified?: boolean;
 }
+
+// Model selection
+export type GeminiModel = 'gemini-3-flash-preview' | 'gemini-3-pro-preview';
 
 // Telemetry types
 export type TelemetryLevel = 'off' | 'statistics' | 'verbose';

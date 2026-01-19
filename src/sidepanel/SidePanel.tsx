@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage, TelemetryLevel, PageMode } from '../../types';
+import type { SourceDocument, VerificationResult, ExtensionState, ExtensionMessage, TelemetryLevel, PageMode, GeminiModel } from '../../types';
 
 const DEFAULT_MAX_SOURCES = 10;
 
@@ -21,6 +21,8 @@ const SidePanel: React.FC = () => {
   const [maxSources, setMaxSources] = useState(DEFAULT_MAX_SOURCES);
   const [maxSourcesSaved, setMaxSourcesSaved] = useState(false);
   const maxSourcesRef = useRef(DEFAULT_MAX_SOURCES);
+  const [model, setModel] = useState<GeminiModel>('gemini-3-flash-preview');
+  const [modelSaved, setModelSaved] = useState(false);
 
   // Load initial state and listen for storage changes
   useEffect(() => {
@@ -52,6 +54,13 @@ const SidePanel: React.FC = () => {
       maxSourcesRef.current = value;
     });
 
+    // Load saved model
+    chrome.runtime.sendMessage({ type: 'GET_MODEL' }, (response) => {
+      if (response?.model) {
+        setModel(response.model);
+      }
+    });
+
     // Listen for storage changes (state updates from background/content script)
     const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes.extension_state?.newValue) {
@@ -81,6 +90,12 @@ const SidePanel: React.FC = () => {
     } else if (state.sourceUrls.length > 0 && sources.length === 0) {
       // Initial source load
       initializeSources(state.sourceUrls);
+    }
+
+    // Update decontextualized claim from state (shows immediately when calculated)
+    if (state.decontextualizedClaim && state.claimWasModified) {
+      setVerifiedClaim(state.decontextualizedClaim);
+      setClaimWasModified(true);
     }
   };
 
@@ -155,6 +170,14 @@ const SidePanel: React.FC = () => {
     }
   };
 
+  const handleModelChange = (newModel: GeminiModel) => {
+    setModel(newModel);
+    chrome.runtime.sendMessage({ type: 'SAVE_MODEL', model: newModel }, () => {
+      setModelSaved(true);
+      setTimeout(() => setModelSaved(false), 2000);
+    });
+  };
+
   const handleVerify = async () => {
     if (!claim) return;
     setIsVerifying(true);
@@ -164,7 +187,20 @@ const SidePanel: React.FC = () => {
     setClaimWasModified(false);
 
     try {
-      // Step 1: Fetch content for each source
+      // Step 1: Decontextualize the claim first (runs before crawling)
+      const decontextResponse = await chrome.runtime.sendMessage({
+        type: 'DECONTEXTUALIZE_CLAIM',
+        claim
+      });
+
+      if (decontextResponse?.type === 'DECONTEXTUALIZATION_RESULT') {
+        if (decontextResponse.claimWasModified) {
+          setVerifiedClaim(decontextResponse.decontextualizedClaim);
+          setClaimWasModified(true);
+        }
+      }
+
+      // Step 2: Fetch content for each source
       const updatedSources = [...sources];
 
       for (let i = 0; i < updatedSources.length; i++) {
@@ -202,7 +238,7 @@ const SidePanel: React.FC = () => {
         setSources([...updatedSources]);
       }
 
-      // Step 2: Verify with Gemini
+      // Step 3: Verify with Gemini
       const response = await chrome.runtime.sendMessage({
         type: 'VERIFY_CLAIM',
         claim,
@@ -280,6 +316,27 @@ const SidePanel: React.FC = () => {
               >
                 Google AI Studio
               </a>
+            </p>
+          </div>
+
+          {/* Model Selection */}
+          <div className="space-y-2 pt-3 border-t border-gray-200">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Model
+            </label>
+            <select
+              value={model}
+              onChange={(e) => handleModelChange(e.target.value as GeminiModel)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none bg-white"
+            >
+              <option value="gemini-3-flash-preview">Gemini 3 Flash (Faster)</option>
+              <option value="gemini-3-pro-preview">Gemini 3 Pro (More capable)</option>
+            </select>
+            {modelSaved && (
+              <p className="text-xs text-green-600">Saved!</p>
+            )}
+            <p className="text-xs text-gray-400">
+              Flash is faster and cheaper. Pro is more capable for complex verifications.
             </p>
           </div>
 
@@ -366,6 +423,24 @@ const SidePanel: React.FC = () => {
             className="w-full h-24 p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none bg-gray-50 text-gray-800"
           />
         </div>
+
+        {/* Clarified Claim Section - shows immediately when calculated, only if modified */}
+        {verifiedClaim && claimWasModified && (
+          <div className="p-3 rounded-lg border bg-blue-50 border-blue-200 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-1.5 mb-1">
+              <RefineIcon className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-700">
+                Claim Clarified
+              </span>
+            </div>
+            <p className="text-sm text-blue-800">
+              "{verifiedClaim}"
+            </p>
+            <p className="text-[10px] text-blue-500 mt-1">
+              The selected text was expanded for context before verification.
+            </p>
+          </div>
+        )}
 
         {/* Sources Section */}
         <div className="space-y-2">
@@ -461,26 +536,6 @@ const SidePanel: React.FC = () => {
                 {result.explanation}
               </p>
             </div>
-
-            {/* Show the claim that was actually verified */}
-            {verifiedClaim && (
-              <div className={`p-3 rounded-lg border ${claimWasModified ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <RefineIcon className={`w-3.5 h-3.5 ${claimWasModified ? 'text-blue-600' : 'text-gray-500'}`} />
-                  <span className={`text-xs font-semibold uppercase tracking-wider ${claimWasModified ? 'text-blue-700' : 'text-gray-600'}`}>
-                    {claimWasModified ? 'Claim Clarified' : 'Claim Verified'}
-                  </span>
-                </div>
-                <p className={`text-sm ${claimWasModified ? 'text-blue-800' : 'text-gray-700'}`}>
-                  "{verifiedClaim}"
-                </p>
-                {claimWasModified && (
-                  <p className="text-[10px] text-blue-500 mt-1">
-                    The selected text was expanded for context before verification.
-                  </p>
-                )}
-              </div>
-            )}
 
             {result.evidence.length > 0 && (
               <div className="space-y-2">
