@@ -2,8 +2,7 @@
 
 A Chrome extension that helps users verify claims in AI output by checking them against source citations using Gemini.
 
-https://github.com/user-attachments/assets/fc9075ca-46ef-4298-a6ff-0492bd1b8806
-
+![AI Fact Checker](https://raw.githubusercontent.com/eranhirs/ai-fact-checker/main/public/screenshot.jpg)
 
 ## Motivation
 
@@ -44,6 +43,8 @@ For more details on localized attribution queries, see the [LAQuer paper](https:
 
 ## Usage
 
+https://github.com/user-attachments/assets/fc9075ca-46ef-4298-a6ff-0492bd1b8806
+
 1. Go to [Google Search](https://www.google.com) and search for something that triggers an AI Overview
 2. When an AI Overview is detected, you'll see a purple "AI" badge on the extension icon
 3. Click the extension icon to open the side panel
@@ -58,22 +59,9 @@ For more details on localized attribution queries, see the [LAQuer paper](https:
 
 ## Privacy & Telemetry
 
-This extension prioritizes your privacy:
-
 - **Local storage**: Your Gemini API key and preferences are stored locally on your device
 - **No tracking by default**: The extension does not collect any usage data unless you opt in
-
-### Optional Telemetry
-
-You can optionally enable anonymous usage analytics to help improve the extension. This is **disabled by default** and must be explicitly enabled in Settings.
-
-| Level | What's Collected |
-|-------|------------------|
-| Off (Default) | Nothing |
-| Statistics | Domain of verified pages, success/failure |
-| Verbose | Full URLs, claim text, results, timing |
-
-Telemetry data is sent to Google Analytics and cannot be used to identify you. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for full details.
+- See full privacy policy [here](https://github.com/eranhirs/ai-fact-checker/blob/main/PRIVACY_POLICY.md)
 
 ## Limitations
 
@@ -82,9 +70,8 @@ Telemetry data is sent to Google Analytics and cannot be used to identify you. S
 - **AI-generated code**: This extension was generated using [Claude Code](https://claude.ai/claude-code) by Anthropic. While functional, the code may not follow all best practices.
 - **Source detection**: The extension uses heuristics to detect AI Overviews and extract source URLs, which may not work perfectly on all Google Search variations or locales.
 - **CORS restrictions**: Some websites may block content fetching due to CORS policies.
-- **Text fragment support**: The "scroll to text" highlighting feature requires Chrome and may not work on all websites.
 - **API costs**: While Gemini has a free tier, heavy usage may incur costs.
-- **Content extraction**: HTML-to-text conversion uses regex-based parsing which may not perfectly extract content from all websites.
+- **Content extraction**: The extension may not perfectly extract content from all websites.
 
 ## Citation
 
