@@ -21,25 +21,7 @@ For more details on localized attribution queries, see the [LAQuer paper](https:
 
 ## Installation
 
-### Prerequisites
-- Google Chrome browser
-- A [Gemini API key](https://aistudio.google.com/apikey) (free tier available)
-
-1. **Download the extension**
-   - Go to the [Releases page](https://github.com/eranhirs/ai-fact-checker/releases/latest)
-   - Download `ai-fact-checker-v1.0.0.zip`
-   - Extract the zip file
-
-2. **Load the extension in Chrome**
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in the top right)
-   - Click "Load unpacked"
-   - Select the extracted `dist` folder
-
-3. **Configure your API key**
-   - Click the extension icon in Chrome's toolbar
-   - Click the gear icon to open settings
-   - Enter your Gemini API key and click "Save"
+**[Available on the Chrome Web Store](https://chromewebstore.google.com/detail/ai-fact-checker/ajlnhclklmceofjieakhamopoieiagmj)**
 
 ## Usage
 
